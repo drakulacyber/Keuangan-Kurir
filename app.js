@@ -114,7 +114,6 @@ async function loadUserProfile() {
   if (user) {
     appUser = user;
     document.getElementById('header-username').innerText = user.name;
-    document.getElementById('header-avatar').innerText = user.name.charAt(0).toUpperCase();
   }
 }
 

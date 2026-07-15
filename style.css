@@ -67,7 +67,10 @@ body {
 #app-container {
   width: 100%;
   max-width: 500px; /* Lebar Mobile Ideal */
-  background-color: var(--bg-primary);
+  background: linear-gradient(to bottom, rgba(8, 12, 20, 0.94) 0%, rgba(8, 12, 20, 0.98) 100%), url('bg.jpg');
+  background-size: 150% 150%;
+  background-repeat: no-repeat;
+  animation: bgAnimeMove 35s linear infinite alternate;
   min-height: 100vh;
   position: relative;
   display: flex;
@@ -76,6 +79,15 @@ body {
   border-left: 1px solid var(--border-color);
   border-right: 1px solid var(--border-color);
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes bgAnimeMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -778,4 +790,109 @@ h1, h2, h3, h4, h5, h6 {
 }
 .mb-4 {
   margin-bottom: 16px;
+}
+
+/* J&T Red Brand Accent */
+img.avatar {
+  border: 2px solid #EF4444 !important;
+  background-color: #0F1626;
+  object-fit: cover;
+  padding: 2px;
+}
+
+/* Anime Running Silhouette Overlay */
+.anime-runners-container {
+  position: absolute;
+  bottom: 74px; /* Tepat di atas bottom nav */
+  left: 0;
+  right: 0;
+  height: 36px;
+  pointer-events: none;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Naruto Runner Silhouette (Orange Neon) */
+.naruto-runner {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  bottom: 0;
+  left: -50px;
+  /* SVG siluet orang berlari ala Naruto */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23F97316'%3E%3Cpath d='M20.82 11.29l-3.32-3.3a2 2 0 0 0-2.83 0l-5.65 5.66a2 2 0 0 0 0 2.83l3.3 3.3a2 2 0 0 0 2.83 0l5.66-5.66a2 2 0 0 0 0-2.83zm-10.6 6.36l-3.3-3.3a2 2 0 0 0-2.83 0l-2.83 2.83a2 2 0 0 0 0 2.83l3.3 3.3a2 2 0 0 0 2.83 0l2.83-2.83a2 2 0 0 0 0-2.83z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  animation: runNaruto 14s linear infinite, bobbing 0.38s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 4px #F97316);
+}
+
+/* Sasuke Chasing Silhouette (Purple Neon) */
+.sasuke-runner {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  bottom: 0;
+  left: -110px;
+  /* SVG siluet orang mengejar */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23A855F7'%3E%3Cpath d='M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  animation: runSasuke 14s linear infinite, bobbing 0.32s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 4px #A855F7);
+}
+
+@keyframes runNaruto {
+  0% {
+    left: -50px;
+    transform: scaleX(1);
+  }
+  45% {
+    left: 520px;
+    transform: scaleX(1);
+  }
+  46% {
+    left: 520px;
+    transform: scaleX(-1);
+  }
+  95% {
+    left: -50px;
+    transform: scaleX(-1);
+  }
+  100% {
+    left: -50px;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes runSasuke {
+  0% {
+    left: -110px;
+    transform: scaleX(1);
+  }
+  45% {
+    left: 460px;
+    transform: scaleX(1);
+  }
+  46% {
+    left: 460px;
+    transform: scaleX(-1);
+  }
+  95% {
+    left: -110px;
+    transform: scaleX(-1);
+  }
+  100% {
+    left: -110px;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bobbing {
+  0% {
+    transform: translateY(0) rotate(5deg);
+  }
+  100% {
+    transform: translateY(-4px) rotate(15deg);
+  }
 }

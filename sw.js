@@ -1,5 +1,5 @@
 // Service Worker untuk Keuangan Kurir PWA
-const CACHE_NAME = 'keuangan-kurir-v3';
+const CACHE_NAME = 'keuangan-kurir-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './app.js',
   './manifest.json',
   './icon.jpg',
+  './bg.jpg',
   'https://unpkg.com/dexie@4.0.8/dist/dexie.js',
   'https://cdn.jsdelivr.net/npm/chart.js',
   'https://unpkg.com/lucide@latest',
