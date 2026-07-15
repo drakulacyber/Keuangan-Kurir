@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Keuangan Kurir</title>
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- PWA & Mobile Optimization -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0F1626">
+  <link rel="apple-touch-icon" href="icon.jpg">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- CDN Libraries -->
+  <!-- Dexie.js for IndexedDB -->
+  <script src="https://unpkg.com/dexie@4.0.8/dist/dexie.js"></script>
+  <!-- Chart.js for interactive charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- html2pdf for exporting reports to PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+  <div id="app-container">
+    
+    <!-- APP HEADER -->
+    <header class="app-header">
+      <div class="profile-bar">
+        <div class="profile-info">
+          <div class="avatar" id="header-avatar">K</div>
+          <div>
+            <div class="user-name" id="header-username">Kurir Hebat</div>
+            <div class="current-date" id="header-date">Rabu, 15 Juli 2026</div>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="action-icon-btn" onclick="switchTab('pengaturan')" title="Pengaturan">
+            <i data-lucide="settings"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="toast">
+      <i id="toast-icon" data-lucide="info"></i>
+      <span id="toast-message">Notifikasi</span>
+    </div>
+
+    <!-- ==============================================
+         SECTION 1: DASHBOARD
+         ============================================== -->
+    <section id="dashboard-section" class="app-section active">
+      <!-- Balance Card -->
+      <div class="card card-primary">
+        <div class="card-title">Saldo Utama</div>
+        <div class="card-value" id="dash-saldo">Rp0</div>
+        <div class="card-subtitle">Uang Masuk - Uang Keluar</div>
+      </div>
+
+      <!-- Quick Stats Grid -->
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-title">Simpanan</div>
+          <div class="card-value" id="dash-simpanan" style="color: var(--color-blue)">Rp0</div>
+          <div class="card-subtitle">Saldo Terpisah</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Bonus Bulanan</div>
+          <div class="card-value" id="dash-bonus" style="color: var(--color-green)">Rp0</div>
+          <div class="card-subtitle" id="dash-bonus-subtitle">Belum Ada Target</div>
+        </div>
+      </div>
+
+      <!-- Target Delivery Card -->
+      <div class="card">
+        <div class="card-title">Target Delivery Bulan Ini</div>
+        <div class="card-value" id="dash-delivery-count">0 <span style="font-size: 1rem; color: var(--text-secondary);">paket</span></div>
+        
+        <div class="progress-container">
+          <div class="progress-header">
+            <span id="dash-progress-percent">0% Tercapai</span>
+            <span id="dash-progress-target">Target: 2500</span>
+          </div>
+          <div class="progress-track progress-track-bg">
+            <div class="progress-bar" id="dash-progress-bar"></div>
+          </div>
+        </div>
+        <div class="card-subtitle mt-4" id="dash-target-status">Sisa 2500 paket lagi menuju target minimum.</div>
+      </div>
+
+      <!-- Quick Menu Grid -->
+      <h3 class="mb-4" style="font-size: 1rem;">Akses Cepat</h3>
+      <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 0;">
+        <button class="btn btn-outline" onclick="switchTab('statistik')">
+          <i data-lucide="bar-chart-2" style="color: var(--color-blue)"></i> Statistik
+        </button>
+        <button class="btn btn-outline" onclick="switchTab('riwayat')">
+          <i data-lucide="history" style="color: var(--color-green)"></i> Riwayat Data
+        </button>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 2: KEUANGAN (MASUK, KELUAR, SIMPANAN)
+         ============================================== -->
+    <section id="keuangan-section" class="app-section">
+      <!-- Dashboard Keuangan Mini -->
+      <div class="card" style="background: linear-gradient(135deg, #10B981 0%, #0F1626 100%); border-left: 4px solid var(--color-green)">
+        <div class="card-title" style="color: rgba(255,255,255,0.7)">Saldo Saat Ini (Utama)</div>
+        <div class="card-value" id="keu-saldo">Rp0</div>
+        <div class="card-subtitle" style="color: rgba(255,255,255,0.5)">Di luar saldo simpanan</div>
+      </div>
+
+      <!-- Sub Tabs Form Keuangan -->
+      <div class="sub-tabs">
+        <button class="sub-tab-btn active" onclick="switchKeuanganTab('masuk')">Uang Masuk</button>
+        <button class="sub-tab-btn" onclick="switchKeuanganTab('keluar')">Uang Keluar</button>
+        <button class="sub-tab-btn" onclick="switchKeuanganTab('simpanan')">Simpanan</button>
+      </div>
+
+      <!-- FORM UANG MASUK -->
+      <div id="form-masuk-container" class="keuangan-form-container">
+        <form id="form-income" onsubmit="handleIncomeSubmit(event)">
+          <div class="form-group">
+            <label for="income-date">Tanggal</label>
+            <input type="date" id="income-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="income-amount">Nominal (Rp)</label>
+            <input type="number" id="income-amount" class="form-control" placeholder="Contoh: 50000" required>
+          </div>
+          <div class="form-group">
+            <label for="income-desc">Keterangan</label>
+            <input type="text" id="income-desc" class="form-control" placeholder="Contoh: Gaji mingguan, Tips" required>
+          </div>
+          <button type="submit" class="btn btn-success">
+            <i data-lucide="plus-circle"></i> Simpan Uang Masuk
+          </button>
+        </form>
+      </div>
+
+      <!-- FORM UANG KELUAR -->
+      <div id="form-keluar-container" class="keuangan-form-container" style="display: none;">
+        <form id="form-expense" onsubmit="handleExpenseSubmit(event)">
+          <div class="form-group">
+            <label for="expense-date">Tanggal</label>
+            <input type="date" id="expense-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="expense-amount">Nominal (Rp)</label>
+            <input type="number" id="expense-amount" class="form-control" placeholder="Contoh: 15000" required>
+          </div>
+          <div class="form-group">
+            <label for="expense-desc">Keterangan</label>
+            <input type="text" id="expense-desc" class="form-control" placeholder="Contoh: Bensin, Makan siang" required>
+          </div>
+          <button type="submit" class="btn btn-danger">
+            <i data-lucide="minus-circle"></i> Simpan Uang Keluar
+          </button>
+        </form>
+      </div>
+
+      <!-- FORM SIMPANAN -->
+      <div id="form-simpanan-container" class="keuangan-form-container" style="display: none;">
+        <!-- Card Info Simpanan -->
+        <div class="card" style="background: var(--bg-secondary); border: 1px solid var(--border-color); padding: 15px; margin-bottom: 15px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px;">Total Simpanan</div>
+              <div class="card-value" id="keu-total-simpanan" style="font-size: 1.5rem; color: var(--color-blue)">Rp0</div>
+            </div>
+            <i data-lucide="piggy-bank" style="width: 32px; height: 32px; color: var(--color-blue)"></i>
+          </div>
+        </div>
+
+        <form id="form-savings" onsubmit="handleSavingsSubmit(event)">
+          <div class="form-group">
+            <label for="savings-date">Tanggal</label>
+            <input type="date" id="savings-date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="savings-amount">Nominal (Rp)</label>
+            <input type="number" id="savings-amount" class="form-control" placeholder="Contoh: 20000" required>
+          </div>
+          <div class="form-group">
+            <label for="savings-desc">Keterangan</label>
+            <input type="text" id="savings-desc" class="form-control" placeholder="Contoh: Tabungan wajib" required>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="save"></i> Simpan Ke Tabungan
+          </button>
+        </form>
+
+        <!-- Riwayat Simpanan Mini -->
+        <div class="history-section-title mt-4">
+          <h3>Riwayat Simpanan</h3>
+        </div>
+        <div class="list-container" id="keu-savings-history">
+          <!-- Dinamis oleh JS -->
+          <div class="empty-state">
+            <i data-lucide="info"></i>
+            Belum ada riwayat simpanan.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 3: DELIVERY
+         ============================================== -->
+    <section id="delivery-section" class="app-section">
+      <!-- Input Delivery Harian -->
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="package" style="color: var(--color-blue)"></i> Input Delivery Harian
+        </h3>
+        <form id="form-delivery" onsubmit="handleDeliverySubmit(event)">
+          <div class="form-control-row">
+            <div class="form-group">
+              <label for="delivery-date">Tanggal</label>
+              <input type="date" id="delivery-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="delivery-count">Jumlah Paket</label>
+              <input type="number" id="delivery-count" class="form-control" placeholder="Contoh: 40" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="check-circle-2"></i> Simpan Delivery
+          </button>
+        </form>
+      </div>
+
+      <!-- Ringkasan Performa Delivery -->
+      <div class="dashboard-grid">
+        <div class="card" style="padding: 12px 16px;">
+          <div class="card-title" style="font-size: 0.75rem;">Hari Ini</div>
+          <div class="card-value" id="deliv-today" style="font-size: 1.2rem; color: var(--color-blue)">0 pkt</div>
+        </div>
+        <div class="card" style="padding: 12px 16px;">
+          <div class="card-title" style="font-size: 0.75rem;">Rata-rata Harian</div>
+          <div class="card-value" id="deliv-avg" style="font-size: 1.2rem; color: var(--color-yellow)">0 pkt</div>
+        </div>
+      </div>
+
+      <!-- Progress Target & Perhitungan Bonus -->
+      <div class="card">
+        <h3 style="font-size: 1rem; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+          <span>Bonus Delivery Bulanan</span>
+          <span class="badge badge-green" id="deliv-bonus-tag">Rp0</span>
+        </h3>
+        
+        <div class="petir-info-row">
+          <span class="petir-info-label">Total Bulan Ini</span>
+          <span class="petir-info-val" id="deliv-total-month">0 paket</span>
+        </div>
+
+        <!-- Target 1: 2500 Paket -->
+        <div class="progress-container">
+          <div class="progress-header">
+            <span>Target 1 (2500 pkt)</span>
+            <span id="target-2500-percent">0%</span>
+          </div>
+          <div class="progress-track progress-track-bg">
+            <div class="progress-bar" id="bar-target-2500" style="background: var(--color-blue); box-shadow: 0 0 10px var(--color-blue);"></div>
+          </div>
+          <div class="card-subtitle mt-4" id="target-2500-status" style="font-size: 0.75rem;">Kurang 2500 paket lagi.</div>
+        </div>
+
+        <!-- Target 2: 3500 Paket -->
+        <div class="progress-container" style="margin-top: 20px;">
+          <div class="progress-header">
+            <span>Target 2 (3500 pkt)</span>
+            <span id="target-3500-percent">0%</span>
+          </div>
+          <div class="progress-track progress-track-bg">
+            <div class="progress-bar" id="bar-target-3500"></div>
+          </div>
+          <div class="card-subtitle mt-4" id="target-3500-status" style="font-size: 0.75rem;">Kurang 3500 paket lagi.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 4: HITUNGAN PETIR (⚡ PETIR)
+         ============================================== -->
+    <section id="petir-section" class="app-section">
+      <div class="card" style="background: linear-gradient(135deg, #1E1B4B 0%, #0F1626 100%); border: 1px solid #4F46E5; box-shadow: 0 8px 30px rgba(79, 70, 229, 0.2);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div>
+            <div class="card-title" style="color: #A5B4FC; font-weight: 700;">⚡ HITUNGAN PETIR</div>
+            <div class="card-value" id="petir-bonus-total" style="color: #FBBF24; text-shadow: 0 0 15px rgba(251, 191, 36, 0.4);">Rp0</div>
+            <div class="card-subtitle" style="color: #818CF8;">Jumlah Delivery × Tarif Petir</div>
+          </div>
+          <span class="badge" style="background-color: rgba(251, 191, 36, 0.15); color: #FBBF24; border: 1px solid #FBBF24;">AKTIF</span>
+        </div>
+
+        <div style="background-color: rgba(0,0,0,0.2); padding: 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+          <div class="petir-info-row">
+            <span class="petir-info-label" style="color: #9CA3AF;">Periode Petir Saat Ini</span>
+            <span class="petir-info-val" id="petir-current-period" style="color: white;">21 Jun - 20 Jul</span>
+          </div>
+          <div class="petir-info-row">
+            <span class="petir-info-label" style="color: #9CA3AF;">Total Delivery Petir</span>
+            <span class="petir-info-val" id="petir-current-count" style="color: #60A5FA;">0 paket</span>
+          </div>
+          <div class="petir-info-row" style="border-bottom: none;">
+            <span class="petir-info-label" style="color: #9CA3AF;">Tarif per Paket</span>
+            <span class="petir-info-val" id="petir-current-rate" style="color: #34D399;">Rp3.000</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="history" style="color: #818CF8;"></i> Riwayat Periode Petir
+        </h3>
+        <div class="list-container" id="petir-history-list">
+          <!-- Dinamis oleh JS -->
+          <div class="empty-state">
+            <i data-lucide="info"></i>
+            Belum ada riwayat periode petir sebelumnya.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 5: STATISTIK
+         ============================================== -->
+    <section id="statistik-section" class="app-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="font-size: 1.2rem; font-family: var(--font-display);">Statistik & Grafik</h2>
+        <button class="btn btn-outline btn-sm" style="width: auto;" onclick="switchTab('dashboard')">
+          <i data-lucide="arrow-left"></i> Kembali
+        </button>
+      </div>
+
+      <!-- Chart 1: Keuangan (Masuk vs Keluar vs Simpanan) -->
+      <div class="card">
+        <h3 class="card-title">Arus Keuangan</h3>
+        <div class="chart-container">
+          <canvas id="chart-keuangan"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: Delivery Harian -->
+      <div class="card">
+        <h3 class="card-title">Delivery Harian (30 Hari Terakhir)</h3>
+        <div class="chart-container">
+          <canvas id="chart-delivery-harian"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 3: Delivery Bulanan -->
+      <div class="card">
+        <h3 class="card-title">Delivery Bulanan</h3>
+        <div class="chart-container">
+          <canvas id="chart-delivery-bulanan"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 4: Perbandingan Bonus -->
+      <div class="card">
+        <h3 class="card-title">Bonus Delivery vs Bonus Petir</h3>
+        <div class="chart-container">
+          <canvas id="chart-bonus-perbandingan"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 6: RIWAYAT DATA LENGKAP
+         ============================================== -->
+    <section id="riwayat-section" class="app-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="font-size: 1.2rem; font-family: var(--font-display);">Riwayat Transaksi</h2>
+        <button class="btn btn-outline btn-sm" style="width: auto;" onclick="switchTab('dashboard')">
+          <i data-lucide="arrow-left"></i> Kembali
+        </button>
+      </div>
+
+      <!-- Pencarian dan Filter -->
+      <div class="search-filter-bar">
+        <div class="search-wrapper">
+          <i data-lucide="search"></i>
+          <input type="text" id="history-search" class="form-control search-input" placeholder="Cari keterangan transaksi..." oninput="filterHistory()">
+        </div>
+        
+        <div class="filter-pills">
+          <button class="filter-pill active" onclick="setHistoryTimeFilter('semua')">Semua Waktu</button>
+          <button class="filter-pill" onclick="setHistoryTimeFilter('hari')">Hari Ini</button>
+          <button class="filter-pill" onclick="setHistoryTimeFilter('minggu')">Minggu Ini</button>
+          <button class="filter-pill" onclick="setHistoryTimeFilter('bulan')">Bulan Ini</button>
+          <button class="filter-pill" onclick="setHistoryTimeFilter('tahun')">Tahun Ini</button>
+        </div>
+
+        <div class="filter-pills" style="margin-top: -6px;">
+          <button class="filter-pill active" id="type-pill-all" onclick="setHistoryTypeFilter('semua')">Semua Jenis</button>
+          <button class="filter-pill" id="type-pill-income" onclick="setHistoryTypeFilter('income')">Uang Masuk</button>
+          <button class="filter-pill" id="type-pill-expense" onclick="setHistoryTypeFilter('expense')">Uang Keluar</button>
+          <button class="filter-pill" id="type-pill-savings" onclick="setHistoryTypeFilter('savings')">Simpanan</button>
+          <button class="filter-pill" id="type-pill-delivery" onclick="setHistoryTypeFilter('deliveries')">Delivery</button>
+        </div>
+      </div>
+
+      <!-- List Riwayat Utama -->
+      <div class="list-container" id="main-history-list" style="max-height: 480px;">
+        <!-- Dinamis oleh JS -->
+        <div class="empty-state">
+          <i data-lucide="info"></i>
+          Belum ada riwayat tercatat.
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         SECTION 7: PENGATURAN
+         ============================================== -->
+    <section id="pengaturan-section" class="app-section">
+      <h2 class="mb-4" style="font-size: 1.2rem; font-family: var(--font-display);">Pengaturan Aplikasi</h2>
+      
+      <!-- Form Edit Profil & Tarif -->
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="user" style="color: var(--color-blue)"></i> Profil & Target
+        </h3>
+        <form id="form-settings" onsubmit="handleSettingsSave(event)">
+          <div class="form-group">
+            <label for="settings-name">Nama Pengguna</label>
+            <input type="text" id="settings-name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="settings-target">Target Delivery Bulanan</label>
+            <input type="number" id="settings-target" class="form-control" required>
+          </div>
+          <div class="form-control-row">
+            <div class="form-group">
+              <label for="settings-rate-2500">Tarif Bonus 2500 (Rp)</label>
+              <input type="number" id="settings-rate-2500" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="settings-rate-3500">Tarif Bonus 3500 (Rp)</label>
+              <input type="number" id="settings-rate-3500" class="form-control" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="settings-rate-petir">Tarif Petir per Paket (Rp)</label>
+            <input type="number" id="settings-rate-petir" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i data-lucide="save"></i> Simpan Konfigurasi
+          </button>
+        </form>
+      </div>
+
+      <!-- Ekspor Laporan & Ekspor Data -->
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="download" style="color: var(--color-green)"></i> Ekspor Laporan & Data
+        </h3>
+        
+        <div class="settings-actions">
+          <div class="settings-btn-grid">
+            <button class="btn btn-outline btn-sm" onclick="exportData('csv')">
+              <i data-lucide="file-text" style="color: #60A5FA;"></i> Export CSV
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="exportData('excel')">
+              <i data-lucide="sheet" style="color: #34D399;"></i> Export Excel
+            </button>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="exportPDFReport()">
+            <i data-lucide="file-bar-chart" style="color: #EF4444;"></i> Export Laporan PDF
+          </button>
+        </div>
+      </div>
+
+      <!-- Backup & Restore Database -->
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="database" style="color: var(--color-yellow)"></i> Backup & Restore Database
+        </h3>
+        <p class="card-subtitle mb-4">Simpan seluruh data lokal Anda ke file JSON atau pulihkan data dari file backup sebelumnya.</p>
+        
+        <div class="settings-actions">
+          <button class="btn btn-outline btn-sm" onclick="backupDatabase()">
+            <i data-lucide="upload-cloud" style="color: var(--color-blue)"></i> Backup Data (JSON)
+          </button>
+          
+          <button class="btn btn-outline btn-sm" onclick="triggerRestoreUpload()">
+            <i data-lucide="download-cloud" style="color: var(--color-green)"></i> Restore Data (JSON)
+          </button>
+          <input type="file" id="restore-file-input" style="display: none;" accept=".json" onchange="restoreDatabase(event)">
+        </div>
+      </div>
+    </section>
+
+    <!-- ==============================================
+         BOTTOM NAVIGATION BAR
+         ============================================== -->
+    <nav class="bottom-nav">
+      <a class="nav-item active" onclick="switchTab('dashboard')" id="nav-dashboard">
+        <i data-lucide="home"></i>
+        <span>Dashboard</span>
+      </a>
+      <a class="nav-item" onclick="switchTab('keuangan')" id="nav-keuangan">
+        <i data-lucide="wallet"></i>
+        <span>Keuangan</span>
+      </a>
+      <a class="nav-item" onclick="switchTab('delivery')" id="nav-delivery">
+        <i data-lucide="package"></i>
+        <span>Delivery</span>
+      </a>
+      <a class="nav-item" onclick="switchTab('petir')" id="nav-petir">
+        <i data-lucide="zap"></i>
+        <span>Petir</span>
+      </a>
+      <a class="nav-item" onclick="switchTab('pengaturan')" id="nav-pengaturan">
+        <i data-lucide="settings"></i>
+        <span>Pengaturan</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <!-- Loading scripts -->
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

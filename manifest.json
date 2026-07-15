@@ -1,0 +1,19 @@
+{
+  "name": "Keuangan Kurir",
+  "short_name": "KeuanganKurir",
+  "description": "Aplikasi manajemen keuangan, simpanan, dan performa harian kurir dengan bonus otomatis.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#080C14",
+  "theme_color": "#0F1626",
+  "orientation": "portrait",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
