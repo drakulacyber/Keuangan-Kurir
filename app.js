@@ -592,11 +592,59 @@ async function loadDeliveryData() {
   const avg = uniqueActiveDays > 0 ? Math.round(totalThisMonth / uniqueActiveDays) : 0;
   
   document.getElementById('deliv-avg').innerText = `${avg} pkt/hari`;
+
+  // Render Riwayat Delivery Terakhir
+  await loadDeliveryHistory();
+}
+
+// Render daftar delivery harian terakhir di tab Delivery
+async function loadDeliveryHistory() {
+  const deliveries = await db.deliveries.orderBy('date').reverse().limit(10).toArray();
+  const container = document.getElementById('deliv-history-list');
+  
+  if (deliveries.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i data-lucide="package"></i>
+        Belum ada riwayat delivery harian.
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  container.innerHTML = deliveries.map(item => {
+    const formattedDate = formatDateIndonesianShort(item.date);
+    return `
+      <div class="list-item">
+        <div class="item-left">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="package" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>
+            <div class="item-title">${item.jumlah} Paket</div>
+          </div>
+          <div class="item-date" style="margin-left: 24px;">${formattedDate}</div>
+        </div>
+        <div class="item-right">
+          <button class="delete-btn" onclick="deleteItem('deliveries', ${item.id})" title="Hapus">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  lucide.createIcons();
 }
 
 // Load Tab Petir
 async function loadPetirData() {
   await recalculateEverything();
+  
+  const today = new Date();
+  const currentPeriod = getPetirPeriodDates(today);
+  
+  // Render rincian delivery periode petir aktif saat ini
+  await loadPetirDeliveries(currentPeriod);
   
   // Hitung riwayat petir periode sebelumnya secara berkelompok
   const deliveries = await db.deliveries.toArray();
@@ -613,7 +661,6 @@ async function loadPetirData() {
     return;
   }
   
-  // Tentukan periode-periode petir historis yang ada datanya
   // Kelompokkan delivery berdasarkan periode petirnya
   const periodGroups = {};
   
@@ -635,10 +682,7 @@ async function loadPetirData() {
   // Urutkan berdasarkan tanggal mulai secara menurun (terbaru di atas)
   const sortedPeriods = Object.values(periodGroups).sort((a, b) => b.startDate - a.startDate);
   
-  // Hapus periode saat ini dari riwayat historis jika diinginkan,
-  // namun umumnya tampilkan semua periode sebelumnya saja.
-  const today = new Date();
-  const currentPeriod = getPetirPeriodDates(today);
+  // Hapus periode saat ini dari riwayat historis
   const historicPeriods = sortedPeriods.filter(p => p.label !== currentPeriod.label);
   
   if (historicPeriods.length === 0) {
@@ -670,18 +714,73 @@ async function loadPetirData() {
   lucide.createIcons();
 }
 
+// Render rincian delivery yang berkontribusi ke periode petir aktif saat ini
+async function loadPetirDeliveries(period) {
+  const deliveries = await db.deliveries.toArray();
+  
+  // Filter delivery yang tanggalnya ada dalam rentang periode petir aktif
+  const activePetirDelivs = deliveries.filter(d => {
+    const delivDate = new Date(d.date);
+    return delivDate >= period.startDate && delivDate <= period.endDate;
+  });
+  
+  // Urutkan tanggal terbaru di atas
+  activePetirDelivs.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  const container = document.getElementById('petir-deliveries-list');
+  
+  if (activePetirDelivs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i data-lucide="zap-off"></i>
+        Belum ada delivery pada periode petir aktif ini.
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  container.innerHTML = activePetirDelivs.map(item => {
+    const formattedDate = formatDateIndonesianShort(item.date);
+    const bonusVal = item.jumlah * appUser.ratePetir;
+    return `
+      <div class="list-item">
+        <div class="item-left">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="zap" style="width: 16px; height: 16px; color: #FBBF24;"></i>
+            <div class="item-title">${item.jumlah} Paket</div>
+          </div>
+          <div class="item-date" style="margin-left: 24px;">${formattedDate}</div>
+        </div>
+        <div class="item-right">
+          <div class="item-amount" style="color: #FBBF24;">+ ${formatRupiah(bonusVal)}</div>
+          <button class="delete-btn" onclick="deleteItem('deliveries', ${item.id})" title="Hapus">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  lucide.createIcons();
+}
+
 // Delete Item dari Riwayat
 async function deleteItem(type, id) {
   if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
     await db[type].delete(id);
     showToast("Data berhasil dihapus!", "success");
     
-    // Refresh halaman aktif
+    // Refresh halaman/tab aktif
     const activeSection = document.querySelector('.app-section.active').id;
     if (activeSection === 'riwayat-section') {
       await loadHistory();
     } else if (activeSection === 'keuangan-section') {
       await loadSavingsHistory();
+    } else if (activeSection === 'delivery-section') {
+      await loadDeliveryData();
+    } else if (activeSection === 'petir-section') {
+      await loadPetirData();
     }
     await recalculateEverything();
   }
@@ -1484,3 +1583,113 @@ async function exportPDFReport() {
     showToast("Gagal mengunduh PDF", "error");
   });
 }
+
+// Reset Database Data (Kosongkan seluruh data simulasi)
+async function resetAppDatabase() {
+  const confirmReset = confirm("PERINGATAN! Langkah ini akan menghapus semua catatan pemasukan, pengeluaran, simpanan, dan performa harian Anda. Tindakan ini tidak dapat dibatalkan.\n\nApakah Anda yakin ingin menghapus semua data?");
+  
+  if (confirmReset) {
+    try {
+      // Jalankan transaksi pembersihan data
+      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.settings], async () => {
+        await db.income.clear();
+        await db.expense.clear();
+        await db.savings.clear();
+        await db.deliveries.clear();
+        
+        // Tetapkan flag seeded agar mock data tidak dibuat kembali setelah reload
+        await db.settings.put({ key: 'seeded', value: true });
+      });
+      
+      showToast("Semua data berhasil dikosongkan!", "success");
+      
+      // Hitung ulang untuk mereset dashboard & grafik ke Rp0
+      await recalculateEverything();
+      
+      // Pindahkan user ke dashboard yang bersih
+      switchTab('dashboard');
+    } catch (err) {
+      console.error("Gagal melakukan reset database:", err);
+      showToast("Gagal menghapus data", "error");
+    }
+  }
+}
+
+// Mengisi kembali data simulasi mock untuk uji coba
+async function fillMockDatabase() {
+  const confirmFill = confirm("Apakah Anda ingin mengisi database dengan data simulasi (mock data) selama 35 hari untuk mencoba seluruh grafik dan perhitungan bonus?");
+  
+  if (confirmFill) {
+    try {
+      showToast("Mengisi data simulasi...", "info");
+      
+      // Hapus data lama agar bersih sebelum disisipi mock data
+      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.settings], async () => {
+        await db.income.clear();
+        await db.expense.clear();
+        await db.savings.clear();
+        await db.deliveries.clear();
+        
+        const today = new Date();
+        
+        // Seed Pemasukan
+        const d1 = new Date(); d1.setDate(today.getDate() - 15);
+        const d2 = new Date(); d2.setDate(today.getDate() - 10);
+        const d3 = new Date(); d3.setDate(today.getDate() - 5);
+        const d4 = new Date(); d4.setDate(today.getDate() - 2);
+        await db.income.bulkAdd([
+          { date: d1.toISOString().substring(0, 10), nominal: 1800000, keterangan: 'Gaji Pokok Mingguan' },
+          { date: d2.toISOString().substring(0, 10), nominal: 250000, keterangan: 'Insentif Tips Customer' },
+          { date: d3.toISOString().substring(0, 10), nominal: 1800000, keterangan: 'Gaji Pokok Mingguan' },
+          { date: d4.toISOString().substring(0, 10), nominal: 150000, keterangan: 'Reimbursement Bensin' }
+        ]);
+
+        // Seed Pengeluaran
+        const de1 = new Date(); de1.setDate(today.getDate() - 12);
+        const de2 = new Date(); de2.setDate(today.getDate() - 8);
+        const de3 = new Date(); de3.setDate(today.getDate() - 3);
+        await db.expense.bulkAdd([
+          { date: de1.toISOString().substring(0, 10), nominal: 450000, keterangan: 'Servis Motor Rutin' },
+          { date: de2.toISOString().substring(0, 10), nominal: 120000, keterangan: 'Beli Pertamax & Oli' },
+          { date: de3.toISOString().substring(0, 10), nominal: 65000, keterangan: 'Makan Siang Kurir' }
+        ]);
+
+        // Seed Simpanan
+        const ds1 = new Date(); ds1.setDate(today.getDate() - 14);
+        const ds2 = new Date(); ds2.setDate(today.getDate() - 7);
+        await db.savings.bulkAdd([
+          { date: ds1.toISOString().substring(0, 10), nominal: 150000, keterangan: 'Tabungan Mudik Lebaran' },
+          { date: ds2.toISOString().substring(0, 10), nominal: 150000, keterangan: 'Tabungan Wajib Mingguan' }
+        ]);
+
+        // Seed Deliveries (35 Hari Terakhir)
+        const mockDeliveries = [];
+        for (let i = 35; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toISOString().substring(0, 10);
+          const count = Math.floor(Math.random() * 50) + 45;
+          mockDeliveries.push({
+            date: dateStr,
+            jumlah: count
+          });
+        }
+        await db.deliveries.bulkAdd(mockDeliveries);
+        
+        // Tetapkan flag seeded
+        await db.settings.put({ key: 'seeded', value: true });
+      });
+      
+      showToast("Data simulasi berhasil diisi!", "success");
+      
+      // Update UI & Alihkan ke Dashboard
+      await recalculateEverything();
+      switchTab('dashboard');
+    } catch (err) {
+      console.error("Gagal menyisipkan mock data:", err);
+      showToast("Gagal mengisi data simulasi", "error");
+    }
+  }
+}
+
+

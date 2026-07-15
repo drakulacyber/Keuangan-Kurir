@@ -286,6 +286,18 @@
           <div class="card-subtitle mt-4" id="target-3500-status" style="font-size: 0.75rem;">Kurang 3500 paket lagi.</div>
         </div>
       </div>
+
+      <!-- Riwayat Delivery Mini -->
+      <div class="history-section-title mt-4">
+        <h3>Riwayat Delivery Terakhir</h3>
+      </div>
+      <div class="list-container" id="deliv-history-list">
+        <!-- Dinamis oleh JS -->
+        <div class="empty-state">
+          <i data-lucide="package"></i>
+          Belum ada riwayat delivery harian.
+        </div>
+      </div>
     </section>
 
     <!-- ==============================================
@@ -314,6 +326,20 @@
           <div class="petir-info-row" style="border-bottom: none;">
             <span class="petir-info-label" style="color: #9CA3AF;">Tarif per Paket</span>
             <span class="petir-info-val" id="petir-current-rate" style="color: #34D399;">Rp3.000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail Delivery Periode Ini -->
+      <div class="card">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="package" style="color: #60A5FA;"></i> Detail Delivery Periode Ini
+        </h3>
+        <div class="list-container" id="petir-deliveries-list">
+          <!-- Dinamis oleh JS -->
+          <div class="empty-state">
+            <i data-lucide="info"></i>
+            Belum ada delivery pada periode ini.
           </div>
         </div>
       </div>
@@ -498,6 +524,23 @@
             <i data-lucide="download-cloud" style="color: var(--color-green)"></i> Restore Data (JSON)
           </button>
           <input type="file" id="restore-file-input" style="display: none;" accept=".json" onchange="restoreDatabase(event)">
+        </div>
+      </div>
+
+      <!-- Reset Database -->
+      <div class="card" style="border-color: rgba(239, 68, 68, 0.3); background: linear-gradient(145deg, #150B13 0%, #0F0914 100%);">
+        <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="database" style="color: var(--color-yellow)"></i> Manajemen Data Aplikasi
+        </h3>
+        <p class="card-subtitle mb-4">Hapus seluruh data untuk mulai mencatat keuangan dan performa Anda sendiri dari nol, atau isi data simulasi (mock) untuk menguji fitur aplikasi.</p>
+        
+        <div class="settings-actions">
+          <button class="btn btn-danger btn-sm" onclick="resetAppDatabase()">
+            <i data-lucide="alert-triangle"></i> Hapus Semua Data & Mulai Baru
+          </button>
+          <button class="btn btn-success btn-sm" onclick="fillMockDatabase()" style="margin-top: 8px;">
+            <i data-lucide="plus-circle"></i> Isi Data Simulasi (Mock Data)
+          </button>
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 // Service Worker untuk Keuangan Kurir PWA
-const CACHE_NAME = 'keuangan-kurir-v1';
+const CACHE_NAME = 'keuangan-kurir-v3';
 const ASSETS = [
   './',
   './index.html',
