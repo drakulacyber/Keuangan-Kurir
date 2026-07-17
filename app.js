@@ -16,7 +16,8 @@ let appUser = {
   targetDelivery: 2500,
   rate2500: 700,
   rate3500: 1000,
-  ratePetir: 3000
+  ratePetir: 3000,
+  gajiPokok: 2700000
 };
 
 // Filter untuk Menu Riwayat
@@ -84,11 +85,13 @@ function setDefaultDates() {
   const expenseDate = document.getElementById('expense-date');
   const savingsDate = document.getElementById('savings-date');
   const deliveryDate = document.getElementById('delivery-date');
+  const petirDate = document.getElementById('petir-date');
   
   if (incomeDate) incomeDate.value = todayStr;
   if (expenseDate) expenseDate.value = todayStr;
   if (savingsDate) savingsDate.value = todayStr;
   if (deliveryDate) deliveryDate.value = todayStr;
+  if (petirDate) petirDate.value = todayStr;
 }
 
 function getTodayDateString() {
@@ -113,6 +116,9 @@ async function loadUserProfile() {
   const user = await db.users.toCollection().first();
   if (user) {
     appUser = user;
+    if (appUser.gajiPokok === undefined) {
+      appUser.gajiPokok = 2700000;
+    }
     document.getElementById('header-username').innerText = user.name;
   }
 }
@@ -270,10 +276,10 @@ async function recalculateEverything() {
   
   if (totalDeliveryMonth >= 3500) {
     bonusDelivery = totalDeliveryMonth * appUser.rate3500;
-    bonusLabel = `Target 3500 Tercapai (${formatRupiah(appUser.rate3500)}/pkt)`;
+    bonusLabel = `Target 3500/pkt (${formatRupiah(appUser.rate3500)})`;
   } else if (totalDeliveryMonth >= 2500) {
     bonusDelivery = totalDeliveryMonth * appUser.rate2500;
-    bonusLabel = `Target 2500 Tercapai (${formatRupiah(appUser.rate2500)}/pkt)`;
+    bonusLabel = `Target 2500/pkt (${formatRupiah(appUser.rate2500)})`;
   }
   
   document.getElementById('dash-bonus').innerText = formatRupiah(bonusDelivery);
@@ -330,12 +336,17 @@ async function recalculateEverything() {
     document.getElementById('target-3500-status').innerHTML = `<span style="color: var(--color-green);">Target 3500 Tercapai! Bonus: ${formatRupiah(totalDeliveryMonth * appUser.rate3500)}</span>`;
   }
   
-  // 9. Hitungan Petir
-  await recalculatePetir(deliveries);
+  // 9. Hitungan Petir (Membaca langsung dari tabel petir)
+  const bonusPetir = await recalculatePetir();
+  
+  // 10. Hitung Total Estimasi Gaji Bulan Ini
+  const totalEarnings = appUser.gajiPokok + bonusDelivery + bonusPetir;
+  document.getElementById('dash-earnings').innerText = formatRupiah(totalEarnings);
+  document.getElementById('dash-earnings-details').innerText = `Gaji Pokok (${formatRupiah(appUser.gajiPokok)}) + Bonus (${formatRupiah(bonusDelivery)}) + Petir (${formatRupiah(bonusPetir)})`;
 }
 
-// Menghitung data khusus Petir
-async function recalculatePetir(allDeliveries) {
+// Menghitung data khusus Petir (Membaca langsung dari database tabel petir)
+async function recalculatePetir() {
   const today = new Date();
   const period = getPetirPeriodDates(today);
   
@@ -343,10 +354,12 @@ async function recalculatePetir(allDeliveries) {
   document.getElementById('petir-current-period').innerText = period.label;
   document.getElementById('petir-current-rate').innerText = formatRupiah(appUser.ratePetir);
   
+  // Ambil semua records petir
+  const petirRecords = await db.petir.toArray();
+  
   // Filter delivery pada periode petir saat ini
-  const petirDeliveries = allDeliveries.filter(d => {
+  const petirDeliveries = petirRecords.filter(d => {
     const delivDate = new Date(d.date);
-    // Bandingkan waktu
     return delivDate >= period.startDate && delivDate <= period.endDate;
   });
   
@@ -355,6 +368,8 @@ async function recalculatePetir(allDeliveries) {
   
   document.getElementById('petir-current-count').innerText = `${totalDeliveryPetir} paket`;
   document.getElementById('petir-bonus-total').innerText = formatRupiah(bonusPetir);
+  
+  return bonusPetir;
 }
 
 // Helper Menghitung Tanggal Periode Petir (21 s.d 20)
@@ -522,6 +537,33 @@ async function handleDeliverySubmit(e) {
   await loadDeliveryData();
 }
 
+// Form Input Petir Harian
+async function handlePetirSubmit(e) {
+  e.preventDefault();
+  const dateVal = document.getElementById('petir-date').value;
+  const countVal = Number(document.getElementById('petir-count').value);
+  
+  if (!dateVal || countVal <= 0) {
+    showToast("Isi form dengan benar!", "error");
+    return;
+  }
+  
+  const period = getPetirPeriodDates(new Date(dateVal));
+  
+  await db.petir.add({
+    date: dateVal,
+    jumlah: countVal,
+    periode: period.idPeriode
+  });
+  
+  document.getElementById('petir-count').value = '';
+  setDefaultDates();
+  
+  showToast("Data delivery petir disimpan!", "success");
+  await recalculateEverything();
+  await loadPetirData();
+}
+
 // Load Tab Keuangan
 function loadKeuanganData() {
   recalculateEverything();
@@ -646,7 +688,7 @@ async function loadPetirData() {
   await loadPetirDeliveries(currentPeriod);
   
   // Hitung riwayat petir periode sebelumnya secara berkelompok
-  const deliveries = await db.deliveries.toArray();
+  const deliveries = await db.petir.toArray();
   const container = document.getElementById('petir-history-list');
   
   if (deliveries.length === 0) {
@@ -715,7 +757,7 @@ async function loadPetirData() {
 
 // Render rincian delivery yang berkontribusi ke periode petir aktif saat ini
 async function loadPetirDeliveries(period) {
-  const deliveries = await db.deliveries.toArray();
+  const deliveries = await db.petir.toArray();
   
   // Filter delivery yang tanggalnya ada dalam rentang periode petir aktif
   const activePetirDelivs = deliveries.filter(d => {
@@ -753,7 +795,7 @@ async function loadPetirDeliveries(period) {
         </div>
         <div class="item-right">
           <div class="item-amount" style="color: #FBBF24;">+ ${formatRupiah(bonusVal)}</div>
-          <button class="delete-btn" onclick="deleteItem('deliveries', ${item.id})" title="Hapus">
+          <button class="delete-btn" onclick="deleteItem('petir', ${item.id})" title="Hapus">
             <i data-lucide="trash-2"></i>
           </button>
         </div>
@@ -810,26 +852,51 @@ async function loadHistory() {
   const expenses = (await db.expense.toArray()).map(item => ({ ...item, type: 'expense' }));
   const savings = (await db.savings.toArray()).map(item => ({ ...item, type: 'savings' }));
   const deliveries = (await db.deliveries.toArray()).map(item => ({ ...item, type: 'deliveries', keterangan: `${item.jumlah} paket` }));
+  const petir = (await db.petir.toArray()).map(item => ({ ...item, type: 'petir', keterangan: `${item.jumlah} paket petir` }));
   
   // Gabungkan semua data
-  let combined = [...incomes, ...expenses, ...savings, ...deliveries];
+  let combined = [...incomes, ...expenses, ...savings, ...deliveries, ...petir];
   
   // 1. Filter tipe data
   if (historyFilters.type !== 'semua') {
     combined = combined.filter(item => item.type === historyFilters.type);
   }
   
-  // 2. Filter Waktu
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // 2. Filter Rentang Tanggal Kustom (Jika Diisi)
+  const startDateVal = document.getElementById('history-start-date').value;
+  const endDateVal = document.getElementById('history-end-date').value;
   
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Senin
+  if (startDateVal) {
+    const startDate = new Date(startDateVal);
+    startDate.setHours(0,0,0,0);
+    combined = combined.filter(item => {
+      const itemDate = new Date(item.date);
+      itemDate.setHours(0,0,0,0);
+      return itemDate >= startDate;
+    });
+  }
   
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  if (endDateVal) {
+    const endDate = new Date(endDateVal);
+    endDate.setHours(23,59,59,999);
+    combined = combined.filter(item => {
+      const itemDate = new Date(item.date);
+      itemDate.setHours(0,0,0,0);
+      return itemDate <= endDate;
+    });
+  }
   
-  if (historyFilters.time !== 'semua') {
+  // 3. Filter Waktu Cepat (Hanya jika rentang tanggal kustom kosong)
+  if (!startDateVal && !endDateVal && historyFilters.time !== 'semua') {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Senin
+    
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfYear = new Date(today.getFullYear(), 0, 1);
+    
     combined = combined.filter(item => {
       const itemDate = new Date(item.date);
       itemDate.setHours(0,0,0,0);
@@ -847,7 +914,7 @@ async function loadHistory() {
     });
   }
   
-  // 3. Filter Pencarian Keterangan
+  // 4. Filter Pencarian Keterangan
   if (historyFilters.search.trim() !== '') {
     combined = combined.filter(item => {
       return item.keterangan && item.keterangan.toLowerCase().includes(historyFilters.search);
@@ -894,6 +961,11 @@ async function loadHistory() {
       amountClass = 'amount-neutral';
       nominalText = `${item.jumlah} pkt`;
       iconName = 'package';
+    } else if (item.type === 'petir') {
+      typeLabel = '<span class="badge" style="background-color: rgba(251,191,36,0.15); color: #FBBF24;">Petir</span>';
+      amountClass = 'amount-neutral';
+      nominalText = `${item.jumlah} pkt`;
+      iconName = 'zap';
     }
     
     const formattedDate = formatDateIndonesianShort(item.date);
@@ -952,6 +1024,12 @@ function setHistoryTypeFilter(typeVal) {
   });
   
   loadHistory();
+}
+
+function clearDateFilter() {
+  document.getElementById('history-start-date').value = '';
+  document.getElementById('history-end-date').value = '';
+  setHistoryTimeFilter('semua');
 }
 
 // ==============================================
@@ -1261,6 +1339,7 @@ function formatMonthLabelShort(monthStr) {
 function loadSettingsForm() {
   document.getElementById('settings-name').value = appUser.name;
   document.getElementById('settings-target').value = appUser.targetDelivery;
+  document.getElementById('settings-salary').value = appUser.gajiPokok;
   document.getElementById('settings-rate-2500').value = appUser.rate2500;
   document.getElementById('settings-rate-3500').value = appUser.rate3500;
   document.getElementById('settings-rate-petir').value = appUser.ratePetir;
@@ -1270,11 +1349,12 @@ async function handleSettingsSave(e) {
   e.preventDefault();
   const nameVal = document.getElementById('settings-name').value;
   const targetVal = Number(document.getElementById('settings-target').value);
+  const salaryVal = Number(document.getElementById('settings-salary').value);
   const rate2500Val = Number(document.getElementById('settings-rate-2500').value);
   const rate3500Val = Number(document.getElementById('settings-rate-3500').value);
   const ratePetirVal = Number(document.getElementById('settings-rate-petir').value);
   
-  if (!nameVal || targetVal <= 0 || rate2500Val <= 0 || rate3500Val <= 0 || ratePetirVal <= 0) {
+  if (!nameVal || targetVal <= 0 || salaryVal <= 0 || rate2500Val <= 0 || rate3500Val <= 0 || ratePetirVal <= 0) {
     showToast("Isi form dengan benar!", "error");
     return;
   }
@@ -1284,6 +1364,7 @@ async function handleSettingsSave(e) {
     await db.users.update(user.id, {
       name: nameVal,
       targetDelivery: targetVal,
+      gajiPokok: salaryVal,
       rate2500: rate2500Val,
       rate3500: rate3500Val,
       ratePetir: ratePetirVal
@@ -1292,6 +1373,7 @@ async function handleSettingsSave(e) {
     await db.users.add({
       name: nameVal,
       targetDelivery: targetVal,
+      gajiPokok: salaryVal,
       rate2500: rate2500Val,
       rate3500: rate3500Val,
       ratePetir: ratePetirVal
@@ -1590,11 +1672,12 @@ async function resetAppDatabase() {
   if (confirmReset) {
     try {
       // Jalankan transaksi pembersihan data
-      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.settings], async () => {
+      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.petir, db.settings], async () => {
         await db.income.clear();
         await db.expense.clear();
         await db.savings.clear();
         await db.deliveries.clear();
+        await db.petir.clear(); // Bersihkan juga tabel petir
         
         // Tetapkan flag seeded agar mock data tidak dibuat kembali setelah reload
         await db.settings.put({ key: 'seeded', value: true });
@@ -1623,11 +1706,12 @@ async function fillMockDatabase() {
       showToast("Mengisi data simulasi...", "info");
       
       // Hapus data lama agar bersih sebelum disisipi mock data
-      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.settings], async () => {
+      await db.transaction('rw', [db.income, db.expense, db.savings, db.deliveries, db.petir, db.settings], async () => {
         await db.income.clear();
         await db.expense.clear();
         await db.savings.clear();
         await db.deliveries.clear();
+        await db.petir.clear(); // Bersihkan juga tabel petir
         
         const today = new Date();
         
@@ -1674,6 +1758,24 @@ async function fillMockDatabase() {
           });
         }
         await db.deliveries.bulkAdd(mockDeliveries);
+
+        // Seed Petir (35 Hari Terakhir - input berbeda dengan delivery umum)
+        const mockPetir = [];
+        for (let i = 35; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(today.getDate() - i);
+          const dateStr = d.toISOString().substring(0, 10);
+          
+          // Random jumlah petir harian 30 s.d 70 paket
+          const count = Math.floor(Math.random() * 40) + 30;
+          const period = getPetirPeriodDates(d);
+          mockPetir.push({
+            date: dateStr,
+            jumlah: count,
+            periode: period.idPeriode
+          });
+        }
+        await db.petir.bulkAdd(mockPetir);
         
         // Tetapkan flag seeded
         await db.settings.put({ key: 'seeded', value: true });

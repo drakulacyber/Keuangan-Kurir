@@ -64,6 +64,13 @@
         <div class="card-subtitle">Uang Masuk - Uang Keluar</div>
       </div>
 
+      <!-- Total Earnings / Estimasi Gaji Card -->
+      <div class="card" style="background: linear-gradient(135deg, #0F172A 0%, #080C14 100%); border-left: 4px solid var(--color-green); margin-bottom: 20px;">
+        <div class="card-title" style="color: var(--text-secondary);">Estimasi Pendapatan Bulan Ini</div>
+        <div class="card-value" id="dash-earnings" style="color: var(--color-green); font-family: var(--font-display); font-size: 1.8rem; font-weight: 800;">Rp2.700.000</div>
+        <div class="card-subtitle" id="dash-earnings-details" style="font-size: 0.75rem; color: var(--text-muted);">Gaji Pokok (Rp2.700.000) + Bonus (Rp0) + Petir (Rp0)</div>
+      </div>
+
       <!-- Quick Stats Grid -->
       <div class="dashboard-grid">
         <div class="card">
@@ -330,6 +337,28 @@
         </div>
       </div>
 
+      <!-- Input Delivery Petir -->
+      <div class="card" style="border: 1px solid rgba(245, 158, 11, 0.3);">
+        <h3 class="mb-4" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="zap" style="color: #FBBF24;"></i> Input Delivery Petir
+        </h3>
+        <form id="form-petir" onsubmit="handlePetirSubmit(event)">
+          <div class="form-control-row">
+            <div class="form-group">
+              <label for="petir-date">Tanggal</label>
+              <input type="date" id="petir-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="petir-count">Jumlah Paket</label>
+              <input type="number" id="petir-count" class="form-control" placeholder="Contoh: 40" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success" style="background: linear-gradient(135deg, #FBBF24 0%, #D97706 100%); border: none; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);">
+            <i data-lucide="check-circle-2"></i> Simpan Delivery Petir
+          </button>
+        </form>
+      </div>
+
       <!-- Detail Delivery Periode Ini -->
       <div class="card">
         <h3 class="mb-4" style="font-size: 1rem; display: flex; align-items: center; gap: 8px;">
@@ -434,6 +463,22 @@
           <button class="filter-pill" id="type-pill-expense" onclick="setHistoryTypeFilter('expense')">Uang Keluar</button>
           <button class="filter-pill" id="type-pill-savings" onclick="setHistoryTypeFilter('savings')">Simpanan</button>
           <button class="filter-pill" id="type-pill-delivery" onclick="setHistoryTypeFilter('deliveries')">Delivery</button>
+          <button class="filter-pill" id="type-pill-petir" onclick="setHistoryTypeFilter('petir')">Petir</button>
+        </div>
+        
+        <!-- Filter Rentang Tanggal Kustom -->
+        <div style="display: flex; gap: 8px; align-items: center; background-color: var(--bg-secondary); border: 1px solid var(--border-color); padding: 10px; border-radius: 12px;">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 500;">Dari Tanggal</label>
+            <input type="date" id="history-start-date" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; height: 34px;" onchange="filterHistory()">
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.7rem; color: var(--text-secondary); font-weight: 500;">Sampai Tanggal</label>
+            <input type="date" id="history-end-date" class="form-control" style="padding: 6px 10px; font-size: 0.8rem; height: 34px;" onchange="filterHistory()">
+          </div>
+          <button class="action-icon-btn" onclick="clearDateFilter()" style="margin-top: 18px; width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;" title="Reset Tanggal">
+            <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
+          </button>
         </div>
       </div>
 
@@ -466,6 +511,10 @@
           <div class="form-group">
             <label for="settings-target">Target Delivery Bulanan</label>
             <input type="number" id="settings-target" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="settings-salary">Gaji Pokok (Rp)</label>
+            <input type="number" id="settings-salary" class="form-control" required>
           </div>
           <div class="form-control-row">
             <div class="form-group">
