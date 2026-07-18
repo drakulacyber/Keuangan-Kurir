@@ -17,7 +17,8 @@ let appUser = {
   rate2500: 700,
   rate3500: 1000,
   ratePetir: 3000,
-  gajiPokok: 2700000
+  gajiPokok: 2700000,
+  uangBensin: 30000
 };
 
 // Filter untuk Menu Riwayat
@@ -118,6 +119,9 @@ async function loadUserProfile() {
     appUser = user;
     if (appUser.gajiPokok === undefined) {
       appUser.gajiPokok = 2700000;
+    }
+    if (appUser.uangBensin === undefined) {
+      appUser.uangBensin = 30000;
     }
     document.getElementById('header-username').innerText = user.name;
   }
@@ -339,10 +343,38 @@ async function recalculateEverything() {
   // 9. Hitungan Petir (Membaca langsung dari tabel petir)
   const bonusPetir = await recalculatePetir();
   
-  // 10. Hitung Total Estimasi Gaji Bulan Ini
-  const totalEarnings = appUser.gajiPokok + bonusDelivery + bonusPetir;
+  // 10. Hitung Hari Kerja dan Uang Bensin Bulan Ini
+  const workingDays = new Set();
+  
+  // Ambil deliveries bulan ini
+  deliveries.forEach(d => {
+    const delivDate = new Date(d.date);
+    if (delivDate.getFullYear() === currentYear && delivDate.getMonth() === currentMonth && Number(d.jumlah) > 0) {
+      workingDays.add(d.date);
+    }
+  });
+  
+  // Ambil petir bulan ini
+  const petirRecordsForDays = await db.petir.toArray();
+  petirRecordsForDays.forEach(p => {
+    const pDate = new Date(p.date);
+    if (pDate.getFullYear() === currentYear && pDate.getMonth() === currentMonth && Number(p.jumlah) > 0) {
+      workingDays.add(p.date);
+    }
+  });
+  
+  const totalWorkingDays = workingDays.size;
+  const totalBensin = totalWorkingDays * (appUser.uangBensin !== undefined ? appUser.uangBensin : 30000);
+  
+  // 11. Hitung Total Estimasi Gaji Bulan Ini
+  const totalEarnings = appUser.gajiPokok + totalBensin + bonusDelivery + bonusPetir;
   document.getElementById('dash-earnings').innerText = formatRupiah(totalEarnings);
-  document.getElementById('dash-earnings-details').innerText = `Gaji Pokok (${formatRupiah(appUser.gajiPokok)}) + Bonus (${formatRupiah(bonusDelivery)}) + Petir (${formatRupiah(bonusPetir)})`;
+  document.getElementById('dash-earnings-details').innerText = `Gaji Pokok (${formatRupiah(appUser.gajiPokok)}) + Bensin (${formatRupiah(totalBensin)}) + Bonus (${formatRupiah(bonusDelivery)}) + Petir (${formatRupiah(bonusPetir)})`;
+  
+  // 12. Hitung Rata-Rata Gaji per Hari Kerja
+  const averageSalary = totalWorkingDays > 0 ? (totalEarnings / totalWorkingDays) : 0;
+  document.getElementById('dash-average-salary').innerText = formatRupiah(averageSalary);
+  document.getElementById('dash-average-details').innerText = `Total Pendapatan: ${formatRupiah(totalEarnings)} / ${totalWorkingDays} Hari Kerja`;
 }
 
 // Menghitung data khusus Petir (Membaca langsung dari database tabel petir)
@@ -857,6 +889,32 @@ async function loadHistory() {
   // Gabungkan semua data
   let combined = [...incomes, ...expenses, ...savings, ...deliveries, ...petir];
   
+  // Hitung Saldo Berjalan (Running Balance) untuk transaksi finansial secara kronologis
+  const cashTx = [...incomes, ...expenses];
+  cashTx.sort((a, b) => {
+    const dateDiff = new Date(a.date) - new Date(b.date);
+    if (dateDiff !== 0) return dateDiff;
+    return a.id - b.id;
+  });
+  
+  let runningBal = 0;
+  const cashTxMap = {};
+  cashTx.forEach(tx => {
+    if (tx.type === 'income') {
+      runningBal += Number(tx.nominal);
+    } else {
+      runningBal -= Number(tx.nominal);
+    }
+    cashTxMap[`${tx.type}-${tx.id}`] = runningBal;
+  });
+  
+  combined.forEach(item => {
+    const key = `${item.type}-${item.id}`;
+    if (cashTxMap[key] !== undefined) {
+      item.runningBalance = cashTxMap[key];
+    }
+  });
+  
   // 1. Filter tipe data
   if (historyFilters.type !== 'semua') {
     combined = combined.filter(item => item.type === historyFilters.type);
@@ -977,7 +1035,11 @@ async function loadHistory() {
             <i data-lucide="${iconName}" style="width: 16px; height: 16px; color: var(--text-secondary);"></i>
             <div class="item-title">${item.keterangan}</div>
           </div>
-          <div class="item-date" style="margin-left: 24px;">${formattedDate} ${typeLabel}</div>
+          <div class="item-date" style="margin-left: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+            <span>${formattedDate}</span> 
+            ${typeLabel} 
+            ${item.runningBalance !== undefined ? `<span style="color: var(--text-muted); font-size: 0.75rem;">(Saldo: ${formatRupiah(item.runningBalance)})</span>` : ''}
+          </div>
         </div>
         <div class="item-right">
           <div class="item-amount ${amountClass}">${nominalText}</div>
@@ -1340,6 +1402,7 @@ function loadSettingsForm() {
   document.getElementById('settings-name').value = appUser.name;
   document.getElementById('settings-target').value = appUser.targetDelivery;
   document.getElementById('settings-salary').value = appUser.gajiPokok;
+  document.getElementById('settings-bensin').value = appUser.uangBensin;
   document.getElementById('settings-rate-2500').value = appUser.rate2500;
   document.getElementById('settings-rate-3500').value = appUser.rate3500;
   document.getElementById('settings-rate-petir').value = appUser.ratePetir;
@@ -1350,11 +1413,12 @@ async function handleSettingsSave(e) {
   const nameVal = document.getElementById('settings-name').value;
   const targetVal = Number(document.getElementById('settings-target').value);
   const salaryVal = Number(document.getElementById('settings-salary').value);
+  const bensinVal = Number(document.getElementById('settings-bensin').value);
   const rate2500Val = Number(document.getElementById('settings-rate-2500').value);
   const rate3500Val = Number(document.getElementById('settings-rate-3500').value);
   const ratePetirVal = Number(document.getElementById('settings-rate-petir').value);
   
-  if (!nameVal || targetVal <= 0 || salaryVal <= 0 || rate2500Val <= 0 || rate3500Val <= 0 || ratePetirVal <= 0) {
+  if (!nameVal || targetVal <= 0 || salaryVal <= 0 || bensinVal < 0 || rate2500Val <= 0 || rate3500Val <= 0 || ratePetirVal <= 0) {
     showToast("Isi form dengan benar!", "error");
     return;
   }
@@ -1365,6 +1429,7 @@ async function handleSettingsSave(e) {
       name: nameVal,
       targetDelivery: targetVal,
       gajiPokok: salaryVal,
+      uangBensin: bensinVal,
       rate2500: rate2500Val,
       rate3500: rate3500Val,
       ratePetir: ratePetirVal
@@ -1374,6 +1439,7 @@ async function handleSettingsSave(e) {
       name: nameVal,
       targetDelivery: targetVal,
       gajiPokok: salaryVal,
+      uangBensin: bensinVal,
       rate2500: rate2500Val,
       rate3500: rate3500Val,
       ratePetir: ratePetirVal
@@ -1662,6 +1728,171 @@ async function exportPDFReport() {
   }).catch(err => {
     console.error(err);
     showToast("Gagal mengunduh PDF", "error");
+  });
+}
+
+// Ekspor Mutasi Rekening Koran PDF (Bank Statement)
+async function exportRekeningKoran() {
+  showToast("Menyiapkan Mutasi Rekening Koran...", "info");
+  
+  // 1. Ambil data transaksi keuangan
+  const incomes = (await db.income.toArray()).map(item => ({ ...item, type: 'income' }));
+  const expenses = (await db.expense.toArray()).map(item => ({ ...item, type: 'expense' }));
+  
+  // 2. Gabungkan dan urutkan secara kronologis (terlama ke terbaru) untuk menghitung Saldo Berjalan
+  let cashTx = [...incomes, ...expenses];
+  cashTx.sort((a, b) => {
+    const dateDiff = new Date(a.date) - new Date(b.date);
+    if (dateDiff !== 0) return dateDiff;
+    return a.id - b.id;
+  });
+  
+  // 3. Hitung saldo berjalan
+  let runningBal = 0;
+  cashTx.forEach(tx => {
+    if (tx.type === 'income') {
+      runningBal += Number(tx.nominal);
+    } else {
+      runningBal -= Number(tx.nominal);
+    }
+    tx.runningBalance = runningBal;
+  });
+  
+  // 4. Saring berdasarkan rentang tanggal jika dipilih
+  const startDateVal = document.getElementById('history-start-date').value;
+  const endDateVal = document.getElementById('history-end-date').value;
+  
+  let periodLabel = "Semua Waktu";
+  
+  if (startDateVal || endDateVal) {
+    let startLabel = "-";
+    let endLabel = "-";
+    
+    if (startDateVal) {
+      const startD = new Date(startDateVal);
+      startLabel = formatDateIndonesianShort(startDateVal);
+      cashTx = cashTx.filter(tx => new Date(tx.date) >= startD);
+    }
+    if (endDateVal) {
+      const endD = new Date(endDateVal);
+      endD.setHours(23, 59, 59, 999);
+      endLabel = formatDateIndonesianShort(endDateVal);
+      cashTx = cashTx.filter(tx => new Date(tx.date) <= endD);
+    }
+    periodLabel = `${startLabel} s/d ${endLabel}`;
+  }
+  
+  if (cashTx.length === 0) {
+    showToast("Tidak ada transaksi untuk periode ini", "warning");
+    return;
+  }
+  
+  // Hitung saldo awal dan saldo akhir dalam rentang ini
+  const saldoAkhir = cashTx[cashTx.length - 1].runningBalance;
+  let saldoAwal = 0;
+  if (cashTx.length > 0) {
+    const firstTx = cashTx[0];
+    const firstTxNominal = firstTx.type === 'income' ? Number(firstTx.nominal) : -Number(firstTx.nominal);
+    saldoAwal = firstTx.runningBalance - firstTxNominal;
+  }
+  
+  // 5. Buat element tersembunyi untuk template PDF Rekening Koran
+  const reportEl = document.createElement('div');
+  reportEl.style.padding = '40px';
+  reportEl.style.color = '#333333';
+  reportEl.style.backgroundColor = '#ffffff';
+  reportEl.style.fontFamily = 'Courier, monospace, Arial';
+  reportEl.style.fontSize = '12px';
+  reportEl.style.lineHeight = '1.5';
+  
+  const today = new Date();
+  const dateStr = `${today.getDate()} ${MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`;
+  
+  // Header dan Data Ringkasan Koran
+  let rowsHtml = cashTx.map((tx, index) => {
+    const formattedD = formatDateIndonesianShort(tx.date);
+    const debit = tx.type === 'expense' ? formatRupiah(tx.nominal) : '-';
+    const kredit = tx.type === 'income' ? formatRupiah(tx.nominal) : '-';
+    return `
+      <tr style="border-bottom: 1px solid #e5e7eb;">
+        <td style="padding: 6px; text-align: center; border: 1px solid #d1d5db;">${index + 1}</td>
+        <td style="padding: 6px; border: 1px solid #d1d5db;">${formattedD}</td>
+        <td style="padding: 6px; border: 1px solid #d1d5db;">${tx.keterangan}</td>
+        <td style="padding: 6px; text-align: right; color: #EF4444; border: 1px solid #d1d5db;">${debit}</td>
+        <td style="padding: 6px; text-align: right; color: #10B981; border: 1px solid #d1d5db;">${kredit}</td>
+        <td style="padding: 6px; text-align: right; font-weight: bold; border: 1px solid #d1d5db;">${formatRupiah(tx.runningBalance)}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  reportEl.innerHTML = `
+    <div style="border-bottom: 3px double #000000; padding-bottom: 10px; margin-bottom: 20px; text-align: center;">
+      <h1 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 1px;">MUTASI REKENING KORAN KEUANGAN</h1>
+      <h2 style="margin: 5px 0 0 0; font-size: 16px; color: #EF4444; font-weight: bold;">J&T EXPRESS COURIER</h2>
+      <p style="margin: 5px 0 0 0; font-size: 11px; color: #555;">Dicetak pada: ${dateStr}</p>
+    </div>
+    
+    <div style="margin-bottom: 20px; display: flex; justify-content: space-between; font-size: 11px;">
+      <div style="width: 50%;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="font-weight: bold; width: 35%;">NAMA KURIR</td>
+            <td>: ${appUser.name.toUpperCase()}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">PERIODE</td>
+            <td>: ${periodLabel.toUpperCase()}</td>
+          </tr>
+        </table>
+      </div>
+      <div style="width: 45%;">
+        <table style="width: 100%;">
+          <tr>
+            <td style="font-weight: bold; width: 45%;">SALDO AWAL</td>
+            <td style="text-align: right;">: ${formatRupiah(saldoAwal)}</td>
+          </tr>
+          <tr>
+            <td style="font-weight: bold;">SALDO AKHIR</td>
+            <td style="text-align: right; font-weight: bold;">: ${formatRupiah(saldoAkhir)}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    
+    <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 30px;">
+      <thead>
+        <tr style="background-color: #f3f4f6; border-bottom: 2px solid #000;">
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: center; width: 5%;">NO</th>
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: left; width: 15%;">TANGGAL</th>
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: left; width: 40%;">KETERANGAN</th>
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right; width: 13%;">DEBIT (KELUAR)</th>
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right; width: 13%;">KREDIT (MASUK)</th>
+          <th style="padding: 8px; border: 1px solid #d1d5db; text-align: right; width: 14%;">SALDO AKHIR</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+    
+    <div style="margin-top: 40px; font-size: 9px; text-align: center; color: #777; border-top: 1px solid #ddd; padding-top: 10px;">
+      Mutasi ini diterbitkan secara sah dan otomatis oleh Aplikasi Keuangan Kurir J&T Express.
+    </div>
+  `;
+  
+  const opt = {
+    margin:       10,
+    filename:     `Rekening_Koran_Kurir_${appUser.name.replace(/\s+/g, '_')}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2 },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+  
+  html2pdf().from(reportEl).set(opt).save().then(() => {
+    showToast("Rekening Koran PDF berhasil diunduh!", "success");
+  }).catch(err => {
+    console.error(err);
+    showToast("Gagal mencetak Rekening Koran", "error");
   });
 }
 

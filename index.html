@@ -68,7 +68,14 @@
       <div class="card" style="background: linear-gradient(135deg, #0F172A 0%, #080C14 100%); border-left: 4px solid var(--color-green); margin-bottom: 20px;">
         <div class="card-title" style="color: var(--text-secondary);">Estimasi Pendapatan Bulan Ini</div>
         <div class="card-value" id="dash-earnings" style="color: var(--color-green); font-family: var(--font-display); font-size: 1.8rem; font-weight: 800;">Rp2.700.000</div>
-        <div class="card-subtitle" id="dash-earnings-details" style="font-size: 0.75rem; color: var(--text-muted);">Gaji Pokok (Rp2.700.000) + Bonus (Rp0) + Petir (Rp0)</div>
+        <div class="card-subtitle" id="dash-earnings-details" style="font-size: 0.75rem; color: var(--text-muted);">Gaji Pokok (Rp2.700.000) + Bensin (Rp0) + Bonus (Rp0) + Petir (Rp0)</div>
+      </div>
+
+      <!-- Rata-Rata Gaji Card -->
+      <div class="card" style="background: linear-gradient(135deg, #0F172A 0%, #080C14 100%); border-left: 4px solid var(--color-blue); margin-bottom: 20px;">
+        <div class="card-title" style="color: var(--text-secondary);">Rata-Rata Gaji per Hari Kerja</div>
+        <div class="card-value" id="dash-average-salary" style="color: var(--color-blue); font-family: var(--font-display); font-size: 1.8rem; font-weight: 800;">Rp0</div>
+        <div class="card-subtitle" id="dash-average-details" style="font-size: 0.75rem; color: var(--text-muted);">Total Pendapatan / 0 Hari Kerja</div>
       </div>
 
       <!-- Quick Stats Grid -->
@@ -480,6 +487,11 @@
             <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
           </button>
         </div>
+        
+        <!-- Tombol Cetak Mutasi Rekening Koran -->
+        <button class="btn btn-primary" onclick="exportRekeningKoran()" style="margin-top: 10px; background: linear-gradient(135deg, var(--color-blue) 0%, #1D4ED8 100%); border: none; box-shadow: var(--shadow-blue); display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+          <i data-lucide="printer" style="width: 18px; height: 18px;"></i> Cetak Rekening Koran (PDF)
+        </button>
       </div>
 
       <!-- List Riwayat Utama -->
@@ -515,6 +527,10 @@
           <div class="form-group">
             <label for="settings-salary">Gaji Pokok (Rp)</label>
             <input type="number" id="settings-salary" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="settings-bensin">Uang Bensin Harian per Hari Kerja (Rp)</label>
+            <input type="number" id="settings-bensin" class="form-control" required>
           </div>
           <div class="form-control-row">
             <div class="form-group">
@@ -594,11 +610,7 @@
       </div>
     </section>
 
-    <!-- Anime Running Silhouettes Overlay -->
-    <div class="anime-runners-container">
-      <div class="naruto-runner"></div>
-      <div class="sasuke-runner"></div>
-    </div>
+
 
     <!-- ==============================================
          BOTTOM NAVIGATION BAR
